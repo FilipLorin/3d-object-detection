@@ -1,1 +1,2 @@
-# 3d-object-detection
+# System stereoskopowej detekcji obiektów i wizualizacji wyników
+ROS, OpenCV, YOLO
