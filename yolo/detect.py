@@ -1,7 +1,8 @@
+#! /usr/bin/python3
 # INPUT: image
-# OUTPUT: [box, category] list
+# OUTPUT: python dict with detected objects as string in stdout
 
-# Requirements: ultralytics, pip 
+# Requirements: python with installed: ultralytics, opencv-python 
 import cv2
 from ultralytics import YOLO
 
@@ -9,5 +10,5 @@ from ultralytics import YOLO
 model = YOLO("yolo11n.pt")
 
 im2 = cv2.imread("bus.jpg")
-results = model.predict(source=im2, save=True, save_txt=True)  # save predictions as labels
-
+results = model.predict(source=im2, save=False)
+print(results[0].boxes)
