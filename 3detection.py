@@ -2,6 +2,20 @@ import numpy as np
 import cv2 as cv
 from ultralytics import YOLO
 from pypylon import pylon
+import os
+
+
+def addCameraEmulator(num_cams = 2):
+    # setup demo environment with N cameras
+    os.environ["PYLON_CAMEMU"] = f"{num_cams}"
+    tlf = pylon.TlFactory.GetInstance()
+    di = pylon.DeviceInfo()
+    di.SetDeviceClass("BaslerCamEmu")
+    devices = tlf.EnumerateDevices([di,])
+    cam_array = pylon.InstantCameraArray(2)
+    for idx, cam in enumerate(cam_array):
+        cam.Attach(tlf.CreateDevice(devices[idx]))
+    return cam_array
 
 def addCamera(ip):
     tlf = pylon.TlFactory.GetInstance()
@@ -16,16 +30,14 @@ def aquireImg(path=None, cam=None):
         return cv.imread(path)
     elif cam is not None:
         cam.Open()
-        cam.AcquisitionMode.SetValue('Continuous')
-        cam.TriggerMode.SetValue('Off')
         cam.StartGrabbing(1)
         grab = cam.RetrieveResult(2000)
         print(grab.GrabSucceeded())
         img = grab.GetArray()
-        cam.close()
+        cam.Close()
         return img
     else:
-        raise Error("Not implemented")
+        raise Error("No cam object or image path provided.")
 
 def cv_imshow(image):
     cv.imshow('image', image)
@@ -80,12 +92,15 @@ def getObjectDistance(obj, depth_map):
 
 
 if __name__ == "__main__":
-    cam1 = addCamera("192.168.1.20")
+    emulators = addCameraEmulator()
     # test object detection
+    cam1 = emulators
     img = aquireImg(cam=cam1)
+    img = cv.cvtColor(img, cv.COLOR_GRAY2RGB)
+    print(np.shape(img))
     results = getObjects(img)
     results.show()
-    print(getObjectsInfo(results))
+
     # test depth detection
     img_l = aquireImg(path="left.png")
     img_r = aquireImg(path="right.png")
