@@ -5,25 +5,12 @@ from pypylon import pylon
 import os
 
 
-def addCameraEmulator(num_cams = 2):
-    # setup demo environment with N cameras
-    os.environ["PYLON_CAMEMU"] = f"{num_cams}"
+def attachCameras():
     tlf = pylon.TlFactory.GetInstance()
-    di = pylon.DeviceInfo()
-    di.SetDeviceClass("BaslerCamEmu")
+    cam_info = tlf.CreateDeviceInfo()
     devices = tlf.EnumerateDevices([di,])
-    cam_array = pylon.InstantCameraArray(2)
-    for idx, cam in enumerate(cam_array):
-        cam.Attach(tlf.CreateDevice(devices[idx]))
-    return cam_array
-
-def addCamera(ip):
-    tlf = pylon.TlFactory.GetInstance()
-    tl = tlf.CreateTl('BaslerGigE')
-    cam_info = tl.CreateDeviceInfo()
-    cam_info.SetIpAddress(ip)
-    camera = pylon.InstantCamera(tlf.CreateDevice(cam_info))
-    return camera
+    cameras = [pylon.InstantCamera(tlf.CreateDevice(device)) for device in devices]
+    return cameras
 
 def aquireImg(path=None, cam=None):
     if path is not None:
@@ -63,8 +50,8 @@ def getDisparity(left_image, right_image):
     return disparity
 
 def getDepth(dispatity_map):
-    focal_length = 12 #mm
-    baseline_camera_distance = 10 #mm
+    focal_length = 6.5 #mm
+    baseline_camera_distance = 180 #mm
     m = focal_length * baseline_camera_distance
     return m / dispatity_map  
 
@@ -92,18 +79,17 @@ def getObjectDistance(obj, depth_map):
 
 
 if __name__ == "__main__":
-    emulators = addCameraEmulator()
     # test object detection
-    cam1 = emulators
-    img = aquireImg(cam=cam1)
+    cameras = attachCameras()
+    img = aquireImg(cam=cameras[0])
     img = cv.cvtColor(img, cv.COLOR_GRAY2RGB)
     print(np.shape(img))
     results = getObjects(img)
     results.show()
 
     # test depth detection
-    img_l = aquireImg(path="left.png")
-    img_r = aquireImg(path="right.png")
+    img_l = aquireImg(cam=cameras[0])
+    img_r = aquireImg(cam=cameras[1])
     disparity = getDisparity(img_l, img_r)
     depth = getDepth(disparity)
     cv_imshow(depth)
