@@ -7,8 +7,8 @@ from datetime import datetime
 from matplotlib import pyplot as plt
 
 
-NUM_DISPARITIES = 32
-BLOCK_SIZE = 155
+NUM_DISPARITIES = 512
+BLOCK_SIZE = 65
 
 def attachCameras():
     tlf = pylon.TlFactory.GetInstance()
@@ -50,14 +50,21 @@ def getDisparity(left_image, right_image):
     #print(np.shape(left_image))
     left_grayscale  = cv.cvtColor(left_image, cv.COLOR_BGR2GRAY);
     right_grayscale = cv.cvtColor(right_image, cv.COLOR_BGR2GRAY);
-    stereo = cv.StereoBM_create(numDisparities=NUM_DISPARITIES, blockSize=BLOCK_SIZE)
+    stereo = cv.StereoSGBM_create(
+        minDisparity=1, 
+        numDisparities=NUM_DISPARITIES, 
+        blockSize=BLOCK_SIZE, 
+        #P1=8*BLOCK_SIZE*BLOCK_SIZE, 
+        #P2=32*BLOCK_SIZE*BLOCK_SIZE,
+        #uniquenessRatio=12
+        )
     disparity = stereo.compute(left_grayscale, right_grayscale)
     return disparity
 
-def getDepth(dispatity_map): # results in mm
+def getDepth(dispatity_map): # results in m
     focal_length = 6.5 #mm
-    camera_baseline_dist = 180 #mm
-    pixel_size = 0.006 #mm
+    camera_baseline_dist = 0.180 #m
+    pixel_size = 0.012 #mm
     m = focal_length * camera_baseline_dist / pixel_size
     return np.divide(m, np.clip(dispatity_map, a_max = None, a_min=1))  
 
@@ -114,10 +121,10 @@ if __name__ == "__main__":
     #save_view(img_l, img_r)
     disparity = getDisparity(img_l, img_r)
     depth = getDepth(disparity)
-    cv_imshow(normalize(resize(disparity, 0.15)))
-    cv_imshow(normalize(resize(depth, 0.15)))
+    cv_imshow(normalize(resize(disparity, 0.12)))
+    cv_imshow(normalize(resize(depth, 0.12)))
     #plt.hist(disparity.ravel(), 100, [0, 500]); plt.show()
-    #plt.hist(depth.ravel(), 255, [-10, 10]); plt.show()
+    #plt.hist(depth.ravel(), 255, range=[0, 10]); plt.show()
     
     """
     for obj in getObjectsInfo(results):
