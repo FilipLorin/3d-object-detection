@@ -7,8 +7,8 @@ from datetime import datetime
 from matplotlib import pyplot as plt
 
 
-NUM_DISPARITIES = 2048
-BLOCK_SIZE = 15
+NUM_DISPARITIES = 32
+BLOCK_SIZE = 155
 
 def attachCameras():
     tlf = pylon.TlFactory.GetInstance()
@@ -39,8 +39,8 @@ def loadCalibrationData(calibration_file_path):
     calibration_data = np.load(calibration_file_path)
     return data['camMatrix'], data['dist_Coeff']
 
-def applyCalibratedCorrection():
-    camMatrix, distCoeff = loadCalibrationData("camera_calibration.npz")
+def applyCorrection(img, calibration_file_path):
+    camMatrix, distCoeff = loadCalibrationData(calibration_file_path)
     h, w = img.shape[:2]
     newCamMatrix, roi = cv.getOptimalNewCameraMatrix(camMatrix, distCoeff, (w, h), 1, (w, h))   
     undistorted = cv.undistort(img, camMatrix, distCoeff, None, newCamMatrix)
@@ -48,19 +48,18 @@ def applyCalibratedCorrection():
 
 def getDisparity(left_image, right_image):
     #print(np.shape(left_image))
-    left_grayscale  = left_image #cv.cvtColor(left_image, cv.COLOR_BGR2GRAY);
-    right_grayscale = right_image #cv.cvtColor(right_image, cv.COLOR_BGR2GRAY);
+    left_grayscale  = cv.cvtColor(left_image, cv.COLOR_BGR2GRAY);
+    right_grayscale = cv.cvtColor(right_image, cv.COLOR_BGR2GRAY);
     stereo = cv.StereoBM_create(numDisparities=NUM_DISPARITIES, blockSize=BLOCK_SIZE)
     disparity = stereo.compute(left_grayscale, right_grayscale)
     return disparity
 
-def getDepth(dispatity_map):
+def getDepth(dispatity_map): # results in mm
     focal_length = 6.5 #mm
-    dist = 180 #mm
-    m = focal_length*dist * 0.000001
-    #m = 120
-    inv_m = 1./m
-    return inv_m * dispatity_map  
+    camera_baseline_dist = 180 #mm
+    pixel_size = 0.006 #mm
+    m = focal_length * camera_baseline_dist / pixel_size
+    return np.divide(m, np.clip(dispatity_map, a_max = None, a_min=1))  
 
 def getObjects(image):
     model = YOLO("yolo11n.pt")  
@@ -91,30 +90,36 @@ def save_view(left_im, right_im):
 
 def resize(img, scale_factor):
     w, h = np.shape(img)
-    print(w, h)
     return cv.resize(img, (int(w*scale_factor), int(h*scale_factor)), interpolation=cv.INTER_LINEAR)
     
+def normalize(img):
+    dmax = img.max()
+    dmin = img.min()
+    return np.uint8((255*img-dmin)/(dmax-dmin))
+
 
 if __name__ == "__main__":
     # test object detection
+    """
     cameras = attachCameras()
     img = aquireImg(cam=cameras[0])
     img = cv.cvtColor(img, cv.COLOR_GRAY2RGB)
     results = getObjects(img) 
     results.show()
+    """
 
     # test depth detection
-    img_l = aquireImg(cam=cameras[0])
-    img_r = aquireImg(cam=cameras[1])
-    #img_l = aquireImg(path="left.png")
-    #img_r = aquireImg(path="right.png")
-    save_view(img_l, img_r)
+    img_l = aquireImg(path="014664_left.png")
+    img_r = aquireImg(path="014664_right.png")
+    #save_view(img_l, img_r)
     disparity = getDisparity(img_l, img_r)
-    #cv_imshow(disparity)
     depth = getDepth(disparity)
-    cv_imshow(resize(depth, 0.25))
-    #plt.hist(disparity.ravel(), 255, [0, NUM_DISPARITIES]); plt.show()
-    #plt.hist(depth.ravel(), 255, [0, 5]); plt.show()
+    cv_imshow(normalize(resize(disparity, 0.15)))
+    cv_imshow(normalize(resize(depth, 0.15)))
+    #plt.hist(disparity.ravel(), 100, [0, 500]); plt.show()
+    #plt.hist(depth.ravel(), 255, [-10, 10]); plt.show()
     
+    """
     for obj in getObjectsInfo(results):
     	print([obj['class'], getObjectDistance(obj, depth)])
+    """
